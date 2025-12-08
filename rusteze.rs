@@ -11,11 +11,11 @@ pub mod rust_eze {
     use crate::components::rocket::Rocket;
     use crate::protocols::messages::{ExplorerToPlanet, OrchestratorToPlanet, PlanetToExplorer, PlanetToOrchestrator};
 
-    struct RustEzeAi {
+    struct RustEze {
         running: bool,
         killed: bool,
     }
-    impl PlanetAI for RustEzeAi {
+    impl PlanetAI for RustEze {
         fn handle_orchestrator_msg(&mut self, state: &mut PlanetState, generator: &Generator, combinator: &Combinator, msg: OrchestratorToPlanet) -> Option<PlanetToOrchestrator> {
             if (self.running && !self.killed) {
                 match msg {
@@ -30,21 +30,19 @@ pub mod rust_eze {
                         let response = PlanetToOrchestrator::InternalStateResponse { planet_id: state.id(), planet_state: state.to_dummy() };
                         Some(response)
                     },
-
                     OrchestratorToPlanet::KillPlanet=>{
                         self.killed=true;
-                        let res= PlanetToOrchestrator::KillPlanetResult { planet_id: state.id(), };
+                        let res= PlanetToOrchestrator::KillPlanetResult { planet_id: state.id() };
                         Some(res)
                     }
-
-                    //non si arriva mai a _ per la logica di planet.run( )
-                    _ => { None }
+                    _ => { None } //non si arriva mai a _ per la logica di planet.run( )
                 }
-            } else if(!self.killed){ Some(PlanetToOrchestrator::Stopped { planet_id: state.id(), }) }
-            else{ None }
+            } else if !self.killed {
+                Some(PlanetToOrchestrator::Stopped { planet_id: state.id() })
+            } else {
+                None
+            }
         }
-
-
         fn handle_explorer_msg(&mut self, state: &mut PlanetState, generator: &Generator, combinator: &Combinator, msg: ExplorerToPlanet) -> Option<PlanetToExplorer> {
             if(self.running && !self.killed) {
                 match msg {
@@ -97,7 +95,6 @@ pub mod rust_eze {
                                     GenericResource::ComplexResources(ComplexResource::Diamond(d)),
                                 )),
                             };
-
                         Some(PlanetToExplorer::CombineResourceResponse { complex_response })
                     },
                     ExplorerToPlanet::GenerateResourceRequest { explorer_id, resource } => {
@@ -121,31 +118,29 @@ pub mod rust_eze {
                         Some(PlanetToExplorer::SupportedResourceResponse { resource_list: generator.all_available_recipes(), })
                     },
                 }
-            } else if !self.killed{
+            } else if !self.killed {
                 Some(PlanetToExplorer::Stopped{})
             }
             else{
                 None
             }
         }
-
         fn handle_asteroid(&mut self, state: &mut PlanetState, generator: &Generator, combinator: &Combinator) -> Option<Rocket> {
             if(self.running) {
-                if state.has_rocket() { state.take_rocket() }
-                else {
+                if state.has_rocket() {
+                    state.take_rocket()
+                } else {
                     None
                 }
-            }else{
+            } else {
                 None
             }
         }
-
         fn start(&mut self, state: &PlanetState) {
             if (!self.running) {
                 self.running = true;
             }
         }
-
         fn stop(&mut self, state: &PlanetState) {
             if (self.running) {
                 self.running = false;
@@ -154,20 +149,20 @@ pub mod rust_eze {
     }
 
     //function to create rust_eze planet
-    pub fn createplanet(
+    pub fn create_planet(
         from_orchestrator: Receiver<OrchestratorToPlanet>,
         to_orchestrator: Sender<PlanetToOrchestrator>,
         from_explorers: Receiver<ExplorerToPlanet>,
         planet_id: u32
     ) -> Planet {
-        let rust_eze_ai = Box::new(RustEzeAi { running: false,killed:false });
+        let rust_eze_ai = Box::new(RustEze { running:false, killed:false });
         let rust_eze_type = PlanetType::D;
         let gen_rules: Vec<BasicResourceType> = vec![BasicResourceType::Carbon, BasicResourceType::Silicon ];
         let comb_rules: Vec<ComplexResourceType> = vec![];
         let orchestrator_channels = (from_orchestrator,to_orchestrator);
 
         let rust_eze = Planet::new(
-            1,
+            planet_id,
             rust_eze_type,
             rust_eze_ai,
             gen_rules,
@@ -175,11 +170,7 @@ pub mod rust_eze {
             orchestrator_channels,
             from_explorers,
         );
-        if (rust_eze.is_ok()) {
-            rust_eze.unwrap()
-        } else {
-            let err = String::from("Rust eze Planet creation failed");
-        }
+        rust_eze.unwrap()
     }
 }
 
@@ -201,16 +192,13 @@ mod tests {
     use crate::components::resource::BasicResource::Oxygen;
     use crate::components::rocket::Rocket;
     use crate::components::sunray::Sunray;
-    use crate::logging::ActorType::Orchestrator;
-    use crate::planets::rusteze::rust_eze::get_rust_eze;
+    use crate::planets::rusteze::rust_eze::create_planet;
     use crate::protocols::messages::{ExplorerToPlanet, OrchestratorToPlanet, PlanetToExplorer, PlanetToOrchestrator};
     use std::sync::OnceLock;
     static FORGE: OnceLock<Forge> = OnceLock::new();
-
     fn get_forge() -> &'static Forge {
         FORGE.get_or_init(|| Forge::new().unwrap())
     }
-
     pub struct MockOrchestrator {
         pub orchestrator_to_planet: Sender<OrchestratorToPlanet>,
         pub planet_to_orchestrator: Receiver<PlanetToOrchestrator>,
@@ -218,7 +206,6 @@ mod tests {
     pub struct Mockforge{
         pub forge: Forge,
     }
-
     pub struct MockExplorer {
         pub explorer_to_planet: Sender<ExplorerToPlanet>,
         pub planet_to_explorer: Receiver<PlanetToExplorer>,
@@ -237,17 +224,14 @@ mod tests {
         let (explorers_to_planet_tx, explorers_to_planet_rx) =
             unbounded::<ExplorerToPlanet>();
         let (planet_to_explorer_tx, planet_to_explorer_rx) =
-        unbounded::<PlanetToExplorer>();
+            unbounded::<PlanetToExplorer>();
 
         let orchestrator= MockOrchestrator{orchestrator_to_planet:orchestrator_to_planet_tx,planet_to_orchestrator:planet_to_orchestrator_rx};
         let explorer=MockExplorer{explorer_to_planet:explorers_to_planet_tx,planet_to_explorer:planet_to_explorer_rx};
-        let rustezewrap=get_rust_eze(orchestrator_to_planet_rx,planet_to_orchestrator_tx,explorers_to_planet_rx);
-        assert!(rustezewrap.is_ok());
-        if(rustezewrap.is_ok()) {
-            let rusteze=rustezewrap.unwrap();
-        }
-
+        let rusteze=create_planet(orchestrator_to_planet_rx,planet_to_orchestrator_tx,explorers_to_planet_rx, 10);
+        assert_eq!(rusteze.id(), 10);
     }
+
     // --- Helper to get a charged cell ---
     fn get_charged_cell() -> EnergyCell {
         let mut cell = EnergyCell::new();
@@ -270,8 +254,7 @@ mod tests {
 
         let orchestrator= MockOrchestrator{orchestrator_to_planet:orchestrator_to_planet_tx,planet_to_orchestrator:planet_to_orchestrator_rx};
         let explorer=MockExplorer{explorer_to_planet:explorers_to_planet_tx,planet_to_explorer:planet_to_explorer_rx};
-        let rustezewrap=get_rust_eze(orchestrator_to_planet_rx,planet_to_orchestrator_tx,explorers_to_planet_rx);
-        let mut rusteze=rustezewrap.unwrap();
+        let mut rusteze=create_planet(orchestrator_to_planet_rx,planet_to_orchestrator_tx,explorers_to_planet_rx,10);
         let handle = thread::spawn(move || {
             let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 let res = rusteze.run();
@@ -286,6 +269,7 @@ mod tests {
 
         (orchestrator, explorer, planet_to_explorer_tx)
     }
+
     #[test]
     fn test_planet_ai_stopped() {
         //creating all channel
@@ -295,7 +279,7 @@ mod tests {
             .send(OrchestratorToPlanet::InternalStateRequest {  })
             .unwrap();
         match orchestrator.planet_to_orchestrator.recv_timeout(Duration::from_millis(300)) {
-            Ok(PlanetToOrchestrator::Stopped {planet_id} )=>assert_eq!(planet_id, 1),
+            Ok(PlanetToOrchestrator::Stopped {planet_id} )=>assert_eq!(planet_id, 10),
             Ok(_)=>panic!("Planet responded while stopped"),
             Err(_)=>panic!("Timeout waiting for stopped planet"),
         }
@@ -306,27 +290,27 @@ mod tests {
             .send(OrchestratorToPlanet::StartPlanetAI {  })
             .unwrap();
         match orchestrator.planet_to_orchestrator.recv_timeout(Duration::from_millis(300)) {
-            Ok(PlanetToOrchestrator::StartPlanetAIResult {planet_id} )=>assert_eq!(planet_id, 1),
+            Ok(PlanetToOrchestrator::StartPlanetAIResult {planet_id} )=>assert_eq!(planet_id, 10),
             Ok(_)=>panic!("Planet responded while stopped"),
             Err(_)=>panic!("Timeout waiting for stopped planet"),
         }
     }
 
-        #[test]
-        fn test_planet_ai_start() {
-            //creating all channel
-            let (orchestrator, explorer, snd_p_to_e) = setup_test();
+    #[test]
+    fn test_planet_ai_start() {
+        //creating all channel
+        let (orchestrator, explorer, snd_p_to_e) = setup_test();
 
-            //verify corret response to startAI
-            orchestrator.orchestrator_to_planet
-                .send(OrchestratorToPlanet::StartPlanetAI {})
-                .unwrap();
-            match orchestrator.planet_to_orchestrator.recv_timeout(Duration::from_millis(300)) {
-                Ok(PlanetToOrchestrator::StartPlanetAIResult { planet_id }) => assert_eq!(planet_id, 1),
-                Ok(_) => panic!("wrong ACK!"),
-                Err(_) => panic!("Timeout waiting for planet"),
-            }
+        //verify corret response to startAI
+        orchestrator.orchestrator_to_planet
+            .send(OrchestratorToPlanet::StartPlanetAI {})
+            .unwrap();
+        match orchestrator.planet_to_orchestrator.recv_timeout(Duration::from_millis(300)) {
+            Ok(PlanetToOrchestrator::StartPlanetAIResult { planet_id }) => assert_eq!(planet_id, 10),
+            Ok(_) => panic!("wrong ACK!"),
+            Err(_) => panic!("Timeout waiting for planet"),
         }
+    }
 
     #[test]
     fn test_planet_ai_int_req() {
@@ -338,7 +322,7 @@ mod tests {
             .send(OrchestratorToPlanet::StartPlanetAI {})
             .unwrap();
         match orchestrator.planet_to_orchestrator.recv_timeout(Duration::from_millis(300)) {
-            Ok(PlanetToOrchestrator::StartPlanetAIResult { planet_id }) => assert_eq!(planet_id, 1),
+            Ok(PlanetToOrchestrator::StartPlanetAIResult { planet_id }) => assert_eq!(planet_id, 10),
             Ok(_) => panic!("wrong ACK!"),
             Err(_) => panic!("Timeout waiting for planet"),
         }
@@ -346,11 +330,12 @@ mod tests {
             .send(OrchestratorToPlanet::InternalStateRequest {})
             .unwrap();
         match orchestrator.planet_to_orchestrator.recv_timeout(Duration::from_millis(300)) {
-            Ok(PlanetToOrchestrator::InternalStateResponse {planet_id, planet_state }) => {assert_eq!(planet_id, 1)},
+            Ok(PlanetToOrchestrator::InternalStateResponse {planet_id, planet_state }) => {assert_eq!(planet_id, 10)},
             Ok(_) => panic!("wrong ACK!"),
             Err(_) => panic!("Timeout waiting for planet"),
         }
     }
+
     #[test]
     fn test_planet_ai_stop() {
         //creating all channel
@@ -361,7 +346,7 @@ mod tests {
             .send(OrchestratorToPlanet::StartPlanetAI {})
             .unwrap();
         match orchestrator.planet_to_orchestrator.recv_timeout(Duration::from_millis(300)) {
-            Ok(PlanetToOrchestrator::StartPlanetAIResult { planet_id }) => assert_eq!(planet_id, 1),
+            Ok(PlanetToOrchestrator::StartPlanetAIResult { planet_id }) => assert_eq!(planet_id, 10),
             Ok(_) => panic!("wrong ACK!"),
             Err(_) => panic!("Timeout waiting for planet"),
         }
@@ -369,7 +354,7 @@ mod tests {
             .send(OrchestratorToPlanet::StopPlanetAI {})
             .unwrap();
         match orchestrator.planet_to_orchestrator.recv_timeout(Duration::from_millis(300)) {
-            Ok(PlanetToOrchestrator::StopPlanetAIResult { planet_id }) => { assert_eq!(planet_id, 1) },
+            Ok(PlanetToOrchestrator::StopPlanetAIResult { planet_id }) => { assert_eq!(planet_id, 10) },
             Ok(_) => panic!("wrong ACK!"),
             Err(_) => panic!("Timeout waiting for planet"),
         }
@@ -379,7 +364,7 @@ mod tests {
             .send(OrchestratorToPlanet::InternalStateRequest {})
             .unwrap();
         match orchestrator.planet_to_orchestrator.recv_timeout(Duration::from_millis(300)) {
-            Ok(PlanetToOrchestrator::Stopped { planet_id }) => { assert_eq!(planet_id, 1) },
+            Ok(PlanetToOrchestrator::Stopped { planet_id }) => { assert_eq!(planet_id, 10) },
             Ok(_) => panic!("wrong ACK!"),
             Err(_) => panic!("Timeout waiting for planet"),
         }
@@ -394,7 +379,7 @@ mod tests {
             .send(OrchestratorToPlanet::StartPlanetAI {})
             .unwrap();
         match orchestrator.planet_to_orchestrator.recv_timeout(Duration::from_millis(300)) {
-            Ok(PlanetToOrchestrator::StartPlanetAIResult { planet_id }) => assert_eq!(planet_id, 1),
+            Ok(PlanetToOrchestrator::StartPlanetAIResult { planet_id }) => assert_eq!(planet_id, 10),
             Ok(_) => panic!("wrong ACK!"),
             Err(_) => panic!("Timeout waiting for planet"),
         }
@@ -402,11 +387,12 @@ mod tests {
             .send(OrchestratorToPlanet::KillPlanet {})
             .unwrap();
         match orchestrator.planet_to_orchestrator.recv_timeout(Duration::from_millis(300)) {
-            Ok(PlanetToOrchestrator::KillPlanetResult { planet_id }) => { assert_eq!(planet_id, 1) },
+            Ok(PlanetToOrchestrator::KillPlanetResult { planet_id }) => { assert_eq!(planet_id, 10) },
             Ok(_) => panic!("wrong ACK!"),
             Err(_) => panic!("Timeout waiting for planet"),
         }
     }
+
     #[test]
     fn test_planet_ai_() {
         //creating all channel
@@ -416,7 +402,7 @@ mod tests {
             .send(OrchestratorToPlanet::StartPlanetAI {})
             .unwrap();
         match orchestrator.planet_to_orchestrator.recv_timeout(Duration::from_millis(300)) {
-            Ok(PlanetToOrchestrator::StartPlanetAIResult { planet_id }) => assert_eq!(planet_id, 1),
+            Ok(PlanetToOrchestrator::StartPlanetAIResult { planet_id }) => assert_eq!(planet_id, 10),
             Ok(_) => panic!("wrong ACK!"),
             Err(_) => panic!("Timeout waiting for planet"),
         }
@@ -424,12 +410,11 @@ mod tests {
             .send(OrchestratorToPlanet::KillPlanet {})
             .unwrap();
         match orchestrator.planet_to_orchestrator.recv_timeout(Duration::from_millis(300)) {
-            Ok(PlanetToOrchestrator::KillPlanetResult { planet_id }) => { assert_eq!(planet_id, 1) },
+            Ok(PlanetToOrchestrator::KillPlanetResult { planet_id }) => { assert_eq!(planet_id, 10) },
             Ok(_) => panic!("wrong ACK!"),
             Err(_) => panic!("Timeout waiting for planet"),
         }
     }
-
 
     #[test]
     fn test_correct_basic_resource_generation() {
@@ -450,7 +435,6 @@ mod tests {
             Ok(_) => panic!("wrong ACK!"),
             Err(_) => panic!("Timeout waiting for explorer"),
         }
-
     }
 
     #[test]
@@ -482,6 +466,3 @@ mod tests {
         }
     }
 }
-
-
-
