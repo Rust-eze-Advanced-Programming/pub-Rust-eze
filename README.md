@@ -1,7 +1,10 @@
 # Rust-eze
-Planet type D:
-Energy cells: Vec<EnergyCell>
-Resource Generation Rules: unbownded
-Rocket: None
-Resource Combination Rules : None
-
+## 🌍 Planet 
+- **Type:** D
+- **Energy cells:** `Vec`
+- **Resource generation rules:** Unbounded 
+## 🚀 Rocket 
+- **Rocket:** `None` 
+## 🔧 Resource Combination Rules 
+- **Combination rules:** `None` 
+---
