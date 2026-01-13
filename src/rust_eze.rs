@@ -44,9 +44,12 @@ pub mod rust_eze{
                 ExplorerToPlanet::GenerateResourceRequest { explorer_id, resource }=> {
                     if let Some((charged_cell, _)) = state.full_cell() {
 
-                        let res = generator.try_make(resource, charged_cell).unwrap();
+                        let res = generator.try_make(resource, charged_cell);
 
-                        Some(PlanetToExplorer::GenerateResourceResponse { resource: Some(res) })
+                        match res {
+                            Ok(resource) => { Some(PlanetToExplorer::GenerateResourceResponse { resource: Some(resource) }) }
+                            Err(error) => { log::error!("{}", error); None }
+                        }
                     }
                     else{
                         Some(PlanetToExplorer::GenerateResourceResponse { resource: None })
