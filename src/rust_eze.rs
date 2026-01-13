@@ -7,12 +7,17 @@ pub mod rust_eze{
     use common_game::components::sunray::Sunray;
     use common_game::protocols::planet_explorer;
     use common_game::protocols::orchestrator_planet;
+    use common_game::protocols::orchestrator_planet::{OrchestratorToPlanet, PlanetToOrchestrator};
     use common_game::protocols::planet_explorer::{ExplorerToPlanet, PlanetToExplorer};
     use common_game::utils::ID;
     use log::log;
 
-    struct RustEzeAI {
+    struct RustEzeAI {}
 
+    impl RustEzeAI {
+        pub fn new() -> Self {
+            RustEzeAI {}
+        }
     }
 
     impl PlanetAI for RustEzeAI {
@@ -84,5 +89,30 @@ pub mod rust_eze{
         }
     }
 
+    pub fn create_planet(
+        id: ID,
+        r_orchestrator: Receiver<OrchestratorToPlanet>,
+        s_orchestrator: Sender<PlanetToOrchestrator>,
+        r_explorer: Receiver<ExplorerToPlanet>,
+    ) -> Planet {
+        let t = Planet::new(id,
+                            PlanetType::D,
+                            Box::new(RustEzeAI::new()),
+                            vec![
+                                BasicResourceType::Carbon,
+                                BasicResourceType::Hydrogen,
+                                BasicResourceType::Oxygen,
+                                BasicResourceType::Silicon
+                            ],
+                            vec![],
+                            (r_orchestrator,s_orchestrator),
+                            r_explorer
+        );
 
+        if t.is_ok() {
+            t.unwrap()
+        } else {
+            panic!("error in planet creation");
+        }
+    }
 }
